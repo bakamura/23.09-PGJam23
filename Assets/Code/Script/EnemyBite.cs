@@ -7,11 +7,14 @@ public class EnemyBite : MonoBehaviour {
 
     [SerializeField] private float _movementSpeed;
     private bool _notWaitingToMove = true;
+    [SerializeField] private Vector3 _trackOffsetDistant;
 
     [Space(8)]
 
     [SerializeField] private float _attackRange;
     [SerializeField] private float _attackDelay;
+
+    [SerializeField] private float _sleepDistance;
 
     [Header("Cache")]
 
@@ -23,10 +26,12 @@ public class EnemyBite : MonoBehaviour {
 
     private void Awake() {
         _rb = GetComponent<Rigidbody>();
+        _rb.useGravity = false;
         _attackWait = new WaitForSeconds(_attackDelay);
 
         _player = FindObjectOfType<Player>();
-        _target = _player.transform;
+        _target = transform;
+        StartCoroutine(Sleep());
     }
 
     private void FixedUpdate() {
@@ -35,7 +40,7 @@ public class EnemyBite : MonoBehaviour {
     }
 
     private void Move() {
-        if (_notWaitingToMove) _rb.velocity = (_target.position - transform.position).normalized * _movementSpeed;
+        if (_notWaitingToMove) _rb.velocity = (_target.position + (Vector3.Distance(_target.position, transform.position) > 3f ? _trackOffsetDistant : Vector3.zero) - transform.position).normalized * _movementSpeed;
         else _rb.velocity = Vector3.zero;
     }
 
@@ -55,4 +60,11 @@ public class EnemyBite : MonoBehaviour {
     public void ChangeTarget(Transform newTarget) {
         _target = newTarget;
     }
+
+    private IEnumerator Sleep() {
+        while (Vector3.Distance(_player.transform.position, transform.position) > _sleepDistance) { yield return null; }
+
+        _target = _player.transform;
+    }
+
 }
