@@ -40,7 +40,10 @@ public class EnemyBite : MonoBehaviour {
     }
 
     private void Move() {
-        if (_notWaitingToMove) _rb.velocity = (_target.position + (Vector3.Distance(_target.position, transform.position) > 3f ? _trackOffsetDistant : Vector3.zero) - transform.position).normalized * _movementSpeed;
+        if (_notWaitingToMove && Vector3.Distance(transform.position, _target.position) > 0.1f) {
+            _rb.velocity = (_target.position + (Vector3.Distance(_target.position, transform.position) > 3f ? _trackOffsetDistant : Vector3.zero) - transform.position).normalized * _movementSpeed;
+            transform.eulerAngles = Vector3.up * Mathf.Atan2(_rb.velocity[0], _rb.velocity[2]) * Mathf.Rad2Deg;
+        }
         else _rb.velocity = Vector3.zero;
     }
 
@@ -49,7 +52,7 @@ public class EnemyBite : MonoBehaviour {
     }
 
     private IEnumerator AttackRoutine() {
-        _player.TakeDamage();
+        _player.TakeDamage(transform.position);
         _notWaitingToMove = false;
 
         yield return _attackWait;

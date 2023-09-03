@@ -12,6 +12,8 @@ public class Player : MonoBehaviour {
     [SerializeField] private float _invincibilityDuration;
     private bool _invincible = false;
 
+    [SerializeField] private float _damagedKnockBack;
+
     [Header("Inputs")]
 
     [SerializeField] private KeyCode _movementForwardKey;
@@ -22,6 +24,12 @@ public class Player : MonoBehaviour {
     [Space(8)]
 
     [SerializeField] private KeyCode _jumpKey;
+
+    [Space(8)]
+
+    [SerializeField] private KeyCode _showMouseKey;
+
+    private bool _canInput = true;
 
     [Header("Movement")]
 
@@ -47,14 +55,19 @@ public class Player : MonoBehaviour {
     [Header("Cache")]
 
     private Rigidbody _rb;
+    private Animator _anim;
     private WaitForSeconds _invincibilityWait;
 
+    private UI_Game _ui;
     private float _fC;
     private Vector3 _v3C;
 
     private void Awake() {
         _rb = GetComponent<Rigidbody>();
+        _anim = GetComponentInChildren<Animator>();
         _invincibilityWait = new WaitForSeconds(_invincibilityDuration);
+
+        _ui = FindObjectOfType<UI_Game>();
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -72,18 +85,30 @@ public class Player : MonoBehaviour {
         _jumpInput -= Time.deltaTime;
         if (Input.GetKeyDown(_jumpKey)) _jumpInput = 0.2f;
         CameraUpdate();
+        MouseLockUpdate();
     }
 
     private void FixedUpdate() {
-        Move();
-        if (_jumpInput > 0 && GroundCheck()) Jump();
+        if (_canInput) {
+            Move();
+            if (GroundCheck()) {
+                if (_jumpInput > 0) Jump();
+                else if (_anim.GetCurrentAnimatorStateInfo(0).IsName("Jump")) _anim.SetTrigger("Fall");
+            }
+        }
     }
 
     private void Move() {
         _v3C[0] = (Input.GetKey(_movementRightKey) ? 1 : 0) + (Input.GetKey(_movementLeftKey) ? -1 : 0);
         _v3C[2] = (Input.GetKey(_movementForwardKey) ? 1 : 0) + (Input.GetKey(_movementBackKey) ? -1 : 0);
-        if (Mathf.Abs(_v3C[0]) + Mathf.Abs(_v3C[2]) > 0) _v3C = 
-                (Quaternion.Euler(0, Mathf.Atan2(_v3C[0], _v3C[2]) * Mathf.Rad2Deg + _cameraRotator.eulerAngles.y, 0) * Vector3.forward).normalized * _movementSpeed;
+        if (Mathf.Abs(_v3C[0]) + Mathf.Abs(_v3C[2]) > 0) {
+            _fC = Mathf.Atan2(_v3C[0], _v3C[2]) * Mathf.Rad2Deg + _cameraRotator.eulerAngles.y; // Target Angle
+            _v3C = (Quaternion.Euler(0, _fC, 0) * Vector3.forward).normalized * _movementSpeed;
+            transform.eulerAngles = Vector3.up * _fC;
+            _anim.SetBool("Running", true);
+        }
+        else _anim.SetBool("Running", false);
+
         _v3C[1] = _rb.velocity.y; // Maintain Y velocity
 
         _rb.velocity = _v3C;
@@ -91,6 +116,7 @@ public class Player : MonoBehaviour {
 
     private void Jump() {
         _jumpInput = 0;
+        _anim.SetTrigger("Jumping");
         _v3C = _rb.velocity;
         _v3C[1] = Mathf.Sqrt(2f * _jumpHeight * Mathf.Abs(Physics.gravity.y));
         _rb.velocity = _v3C;
@@ -110,29 +136,49 @@ public class Player : MonoBehaviour {
         //SetCursorPos(Screen.width / 2, Screen.height / 2);
     }
 
-    public void TakeDamage() {
-        if (!_invincible) StartCoroutine(TakeDamageRoutine());
+    private void MouseLockUpdate() {
+        if (Input.GetKeyDown(_showMouseKey)) {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else if (Input.GetKeyUp(_showMouseKey)) {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
     }
 
-    private IEnumerator TakeDamageRoutine() {
+    public void TakeDamage(Vector3 damageOrigin) {
+        if (!_invincible) StartCoroutine(TakeDamageRoutine(damageOrigin));
+    }
+
+    private IEnumerator TakeDamageRoutine(Vector3 damageOrigin) {
+        _canInput = false;
+
         _healthCurrent--;
+        _ui.ChangeHealthDisplay((float)_healthCurrent / (float)_healthMax);
+
         if (_healthCurrent <= 0) {
             Die();
 
             yield break;
         }
 
+        _v3C = transform.position - damageOrigin;
+        _v3C[1] = 0;
+        _rb.velocity = (Vector3.up * 2 + _v3C.normalized) * _damagedKnockBack;
+
         _invincible = true;
 
         yield return _invincibilityWait;
 
+        _canInput = true;
         _invincible = false;
     }
 
     private void Die() {
         print("player dead");
         // Death Animation
-
+        _canInput = true; // Debug
         // Reset Game
     }
 
